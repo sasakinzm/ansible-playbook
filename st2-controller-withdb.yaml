@@ -1,0 +1,57 @@
+---
+- hosts: 10.9.182.123
+  remote_user: root
+  tasks:
+    - name: "yum update"
+      yum:
+        name: '*'
+        state: latest
+
+    - name: "install policycoreutils-python"
+      yum:
+        name: policycoreutils-python
+
+    - name: "chenge selinux policy 1"
+      shell:  sudo semanage port --list | grep -q 25672 || sudo semanage port -a -t amqp_port_t -p tcp 25672; sudo setsebool -P httpd_can_network_connect 1
+
+    - name: "add epel repo"
+      yum:
+        name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+    - name: "import public key to mongo"
+      shell: sudo rpm --import https://www.mongodb.org/static/pgp/server-3.2.asc
+
+    - name: "create repo file for mongo"
+      shell: echo '[mongodb-org-3.2]' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'name=MongoDB Repository' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'baseurl=https://repo.mongodb.org/yum/redhat/7Server/mongodb-org/3.2/x86_64/' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'gpgcheck=1' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'enabled=1' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'gpgkey=https://www.mongodb.org/static/pgp/server-3.2.asc' >> /etc/yum.repos.d/mongodb-org-3.2.repo;
+
+    - name: "install mongodb"
+      yum:
+        name: mongodb-org
+
+    - name: "install rabbitmq"
+      yum:
+        name: rabbitmq-server
+
+    - name: "start mongod and rabbitmq"
+      shell: sudo systemctl start mongod rabbitmq-server
+
+    - name: "enable mongod and rabbitmq"
+      shell: sudo systemctl enable mongod rabbitmq-server
+
+    - name: "install postgresql"
+      yum:
+        name: postgresql-server,postgresql-contrib,postgresql-devel
+
+    - name: "initialize postgres"
+      ignore_errors: yes
+      shell: sudo postgresql-setup initdb
+
+    - name: "edit pg_hba.conf"
+      shell: sed -i -e /127.0.0.1/s/ident/trust/ /var/lib/pgsql/data/pg_hba.conf
+    - shell: echo "host    all             all             10.9.182.0/24           trust" >> /var/lib/pgsql/data/pg_hba.conf
+
+    - name: "start postgresql"
+      shell: sudo systemctl start postgresql
+
+    - name: "enable postgresql"
+      shell: sudo systemctl enable postgresql
