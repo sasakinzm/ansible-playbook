@@ -21,8 +21,13 @@
     - name: "import public key to mongo"
       shell: sudo rpm --import https://www.mongodb.org/static/pgp/server-3.2.asc
 
-    - name: "create repo file for mongo"
-      shell: echo '[mongodb-org-3.2]' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'name=MongoDB Repository' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'baseurl=https://repo.mongodb.org/yum/redhat/7Server/mongodb-org/3.2/x86_64/' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'gpgcheck=1' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'enabled=1' >> /etc/yum.repos.d/mongodb-org-3.2.repo; echo 'gpgkey=https://www.mongodb.org/static/pgp/server-3.2.asc' >> /etc/yum.repos.d/mongodb-org-3.2.repo;
+    - name: "copy repo file for mongo"
+      copy:
+        src: /root/git/ansible-playbook/config/mongodb-org-3.2.repo
+        dest: /etc/yum.repos.d/mongodb-org-3.2.repo
+        owner: root
+        group: root
+        mode: 0644
 
     - name: "install mongodb"
       yum:
@@ -40,18 +45,104 @@
 
     - name: "install postgresql"
       yum:
-        name: postgresql-server,postgresql-contrib,postgresql-devel
+        name: postgresql-server,postgresql-contrib,postgresql-devel,python-psycopg2
 
     - name: "initialize postgres"
       ignore_errors: yes
       shell: sudo postgresql-setup initdb
 
-    - name: "edit pg_hba.conf"
-      shell: sed -i -e /127.0.0.1/s/ident/trust/ /var/lib/pgsql/data/pg_hba.conf
-    - shell: echo "host    all             all             10.9.182.0/24           trust" >> /var/lib/pgsql/data/pg_hba.conf
+    - name: "copy pg_hba.conf"
+      copy:
+        src: /root/git/ansible-playbook/config/pg_hba.conf
+        dest: /var/lib/pgsql/data/pg_hba.conf
+        owner: postgres
+        group: postgres
+        mode: 0600
 
     - name: "start postgresql"
       shell: sudo systemctl start postgresql
 
     - name: "enable postgresql"
       shell: sudo systemctl enable postgresql
+
+    - name: "copy mongod.conf"
+      copy:
+        src: /root/git/ansible-playbook/config/mongod.conf
+        dest: /etc/mongod.conf
+        owner: root
+        group: root
+        mode: 644
+
+    - name: "restart mongodb"
+      shell: sudo systemctl restart mongod
+
+    - name: "create role mistral to postgresql"
+      postgresql_user:
+        name: mistral
+        role_attr_flags: CREATEDB,LOGIN
+        password: StackStorm
+        encrypted: true
+        login_user: postgres
+        login_host: 127.0.0.1
+
+    - name: "create database mistral"
+      postgresql_db:
+        name: mistral
+        owner: mistral
+        login_user: postgres
+        login_host: 127.0.0.1
+
+    - name: "run st2 script"
+      shell: curl -s https://packagecloud.io/install/repositories/StackStorm/stable/script.rpm.sh | sudo bash
+
+    - name: "import public key to nginx"
+      shell: sudo rpm --import http://nginx.org/keys/nginx_signing.key
+
+    - name: "copy repo file for nginx"
+      copy:
+        src: /root/git/ansible-playbook/config/nginx.repo
+        dest: /etc/yum.repos.d/
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: "install st2web,nginx"
+      yum:
+        name: st2web,nginx
+
+    - name: "make directory"
+      shell: sudo mkdir -p /etc/ssl/st2
+
+    - name: "ssl key gen"
+      shell: sudo openssl req -x509 -newkey rsa:2048 -keyout /etc/ssl/st2/st2.key -out /etc/ssl/st2/st2.crt -days 365 -nodes -subj "/C=US/ST=California/L=Palo Alto/O=StackStorm/OU=Information Technology/CN=$(hostname)"
+
+    - name: "copy st2.conf"
+      copy:
+        src: /root/git/ansible-playbook/config/st2.conf
+        dest: /etc/nginx/conf.d/st2.conf
+        owner: root
+        group: root
+        mode: 0644 
+
+    - name: "edit nginx.conf"
+      shell: sudo sed -i 's/default_server//g' /etc/nginx/nginx.conf
+
+    - name: "restart/enable nginx"
+      shell: systemctl restart nginx; systemctl enable nginx
+
+    - name: "make directory /var/log/st2"
+      shell: mkdir -p /var/log/st2
+
+    - name: "create st2 user"
+      shell: useradd st2
+
+    - name: "copy rabbitmq.config"
+      copy:
+        src: /root/git/ansible-playbook/config/rabbitmq.config
+        dest: /etc/rabbitmq/rabbitmq.config
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: "restart rabbitmq-server"
+      shell: systemctl restart rabbitmq-server
