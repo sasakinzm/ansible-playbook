@@ -49,6 +49,7 @@
 
     - name: "register mistral action"
       shell: /opt/stackstorm/mistral/bin/mistral-db-manage --config-file /etc/mistral/mistral.conf populate
+      ignore_errors: yes
 
     - name: "copy st2.conf"
       copy:

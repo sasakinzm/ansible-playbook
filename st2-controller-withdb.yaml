@@ -59,6 +59,14 @@
         group: postgres
         mode: 0600
 
+    - name: "copy postgresql.conf"
+      copy:
+        src: /root/git/ansible-playbook/config/postgresql.conf
+        dest: /var/lib/pgsql/data/postgresql.conf
+        owner: postgres
+        group: postgres
+        mode: 0600
+
     - name: "start postgresql"
       shell: sudo systemctl start postgresql
 
@@ -135,6 +143,8 @@
 
     - name: "create st2 user"
       shell: useradd st2
+      register: result
+      failed_when: result.rc not in [0,9]
 
     - name: "copy rabbitmq.config"
       copy:
@@ -144,5 +154,5 @@
         group: root
         mode: 0644
 
-    - name: "restart rabbitmq-server"
-      shell: systemctl restart rabbitmq-server
+    - name: "restart rabbitmq-server,postgresql"
+      shell: systemctl restart rabbitmq-server; systemctl restart postgresql
