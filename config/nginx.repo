@@ -1,5 +1,0 @@
-[nginx]
-name=nginx repo
-baseurl=http://nginx.org/packages/rhel/7/x86_64/
-gpgcheck=1
-enabled=1
