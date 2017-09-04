@@ -1,0 +1,3 @@
+---
+- name: "setup nodes"
+  include: st2-node-withdb.yaml

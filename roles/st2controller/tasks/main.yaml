@@ -1,0 +1,3 @@
+---
+- name: "setup controller"
+  include: st2-controller-withdb.yaml
